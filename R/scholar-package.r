@@ -36,7 +36,7 @@ tidy_id <- function(id) {
 
   ## Check with Google to set cookies
   if (getOption("scholar_call_home")) {
-      sample_url <- "https://scholar.google.com/citations?user=B7vSqZsAAAAJ"
+      sample_url <- "http://scholar.google.com/citations?user=B7vSqZsAAAAJ"
       sink <- GET(sample_url)      
       options("scholar_call_home"=FALSE, "scholar_handle"=sink)
   }
