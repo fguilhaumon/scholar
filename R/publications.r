@@ -130,7 +130,7 @@ get_publications <- function(id, cstart = 0, pagesize=100, flush=FALSE) {
 get_article_cite_history <- function (id, article) {
     
     id <- tidy_id(id)
-    url_base <- paste0("http://scholar.google.com/citations?", 
+    url_base <- paste0("https://scholar.google.com/citations?", 
                        "view_op=view_citation&hl=en&citation_for_view=")
     url_tail <- paste(id, article, sep=":")
     url <- paste0(url_base, url_tail)
@@ -158,6 +158,78 @@ get_article_cite_history <- function (id, article) {
     tmp$pubid <- article
     return(tmp)
 }
+
+##' Gets the details of a single article
+##'
+##' @param id a character string giving the id of the scholar
+##' @param article a character string giving the article id.
+##' @return a list giving the title, and other infos available on the page ...
+##' ##' publication id, ...
+##' @importFrom dplyr "%>%"
+##' @importFrom stringr str_replace
+##' @importFrom xml2 read_html
+##' @importFrom rvest html_nodes html_attr html_text
+##' @importFrom httr GET
+##' @export
+get_article_details <- function (id, article, savePage=TRUE, lib=NULL) {
+	
+	#id <- "jJwtZT0AAAAJ" ; article <- "e5wmG9Sq2KIC" #"u-x6o8ySG0sC"
+	# library(R.cache);library(dplyr);library(httr);library(rvest);library(stringr);library(xml2)
+	
+	id <- tidy_id(id)
+	url_base <- paste0("https://scholar.google.com/citations?", 
+				 "view_op=view_citation&hl=en&user=",id,"&sortby=pubdate&citation_for_view=")
+	url_tail <- paste(id, article, sep=":")
+	url <- paste0(url_base, url_tail)
+	
+	doc <- GET(url, handle=getOption("scholar_handle"), set_cookies()) %>% read_html()
+	
+	#getting the link & pdf link
+	link <- html_attr(html_nodes(doc,css=".gsc_title_link"),"href")
+	nodePDF <- as.character(html_nodes(doc,css=".gsc_title_ggi"))
+	if(length(nodePDF)!=0) {
+		link.pdf <- strsplit(nodePDF,"\"")[[1]][grep("http",strsplit(nodePDF,"\"")[[1]])]
+	}else{
+		link.pdf <- NA
+	}
+	
+	all.infos <- html_nodes(doc,css=".gs_scl")
+	fields <- sapply(all.infos,function(i)html_text(html_nodes(i,css=".gsc_field")))
+	all.infos.clean <- lapply(seq_along(all.infos),function(i){
+		
+		it <- all.infos[i]
+		
+		info <- switch(field,
+				Authors=sapply(strsplit(html_text(html_nodes(it,".gsc_value")),",")[[1]],function(x)gsub("^\\s+|\\s+$", "", x)),
+				html_text(html_nodes(it,css=".gsc_value"))
+		)
+		
+		info
+		
+	})
+	
+	names(all.infos.clean) <- fields
+	
+	#merge title, link, link pdf and infos
+	res <- list()
+	res$title <- html_text(html_nodes(doc,css=".gsc_title_link"))
+	res <- c(res,all.infos.clean)
+	res$author_scholarID <- id
+	res$article_scholarID <- article
+	res$link <- link
+	res$linkPDF <- link.pdf
+	
+	#exporting page as "xml_document" object saved in .RData ..
+	objName <- paste0("articlePage_auth_",id,"_art_",article)
+	assign(objName,doc)
+	if(!is.null(lib)){charLib <- paste0(lib,"/")}else{charLib <- NULL}
+	if(!is.null(lib) & !dir.exists(lib)) dir.create(lib)
+	save(list=objName,file=paste0(charLib,objName,".RData"))
+	
+	return(res)
+}
+
+
 
 ##' Calculates how many articles a scholar has published
 ##'
